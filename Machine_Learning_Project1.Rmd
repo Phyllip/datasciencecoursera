@@ -1,0 +1,194 @@
+---
+title: "Machine Learning Project 1"
+author: "Phillip"
+date: "September 26, 2015"
+output: html_document
+---
+
+### Executive Summary
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+### Objective 
+
+The goal of the project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set.Use any of the other variables to predict with. Create a report describing how the model is built , how cross validation is used, and what was the expected out of sample error is, and choices were made. And using the prediction model to predict 20 different test cases. 
+
+
+### Data 
+
+The training data for this project are available here: 
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: 
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+(Class A) exactly according the the specification
+(Class B) throwing the elbows to the front
+(Class C) lifting the dumbbell only halfway
+(Class D) lowering the dumbbell only halfway
+(Class E) throwing the hips to the front
+
+### Data Source (Citation)
+Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements. Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. DOI: 10.1007/978-3-642-34459-6_6. 
+Cited by 2 (Google Scholar)
+
+Read more: http://groupware.les.inf.puc-rio.br/har#ixzz3mu8MFhoA
+
+```{r ,echo=FALSE, warning=FALSE}
+# Load Libraries
+
+library(caret) ;  library(ggplot2); require(dplyr);
+library(kernlab)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(corrplot)
+library(rattle)
+
+#SessionINfo
+sessionInfo()
+
+#Import Training & Test data
+
+filespath<- "C:\\Users\\Phillip\\Desktop\\Coursera\\08_PracticalMachineLearning\\Project"
+setwd(filespath)
+
+urlTrain <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+urlTest  <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+training <- read.csv(url(urlTrain), na.strings=c("NA","#DIV/0!",""), header=T)
+testing <- read.csv(url(urlTest), na.strings=c("NA","#DIV/0!",""), header=T)
+
+
+```
+
+### Data Exploratory
+
+Checking for the dimensions of the Training and Testing data set.
+
+```{r}
+# Check data size(rows) 
+
+dim(training)
+dim(testing)
+```
+
+
+
+```{r}
+
+str(training)
+
+```
+
+From the str() function, it is noticed that many columns/variables are contains "NA".
+
+### Data PreProcessing 
+
+A check on the training and testing data (trainCl & testCl), shows that the columns have been 
+trimmed from 160 to 60.
+
+```{r}
+## Remove columns that constins many NA's values
+trainCl <- training[, colSums(is.na(training)) == 0]
+testCl <- testing[, colSums(is.na(testing)) == 0]
+
+dim(trainCl)
+dim(testCl)
+
+```
+
+
+Next, using the str() function to check on the remaining data training & test data shows that the 1st 7 columns of data contains data may not be useful predictor of Classe.
+
+```{r}
+str(trainCl)
+
+featurePlot(x=trainCl[,c(1,2,3,4,5,6,7)],
+         y = trainCl$classe,
+         plot="pairs")
+
+```
+The above featureplot displays the correlation with the classe variable.
+
+The 1st 7 columns are then removed.
+```{r}
+# remove st 7 columns
+trainCl <- subset(trainCl,select = -c(1:7))
+testCl <- subset(testCl,select = -c(1:7))
+
+
+dim(testCl)
+```
+
+
+### Data is partitioned
+
+Here, the training data is partitioned into 75% training and 25% testing.
+
+```{r}
+set.seed(123)
+inTrain <- createDataPartition(trainCl$classe,p=.75,list=FALSE)
+trainingCl <- trainCl[inTrain,]
+testingCl <- trainCl[-inTrain,]
+
+dim(trainingCl)
+dim(testingCl)
+```
+
+### Training the Model
+
+Here, the model is trained using the Random Forest algorithm as it is 
+rated as highly accurate.
+It was initialy trained using the caret library but it took very long and 
+did not managed to complete.
+As such, the randomForest library is used - which is fast and managed to complete the task.
+
+```{r}
+
+rfModel <- randomForest(classe ~.,data=trainingCl)
+rfPredict <- predict(rfModel,newdata=testingCl)
+confusionMatrix(rfPredict,testingCl$classe)
+
+```
+
+### Sample Error Analysis
+
+From the above statistics, the Accuracy : 0.9951 or 99.51%
+As such, the error is 1-0.9951 = 0.0049 or 0.49%
+
+
+
+### Test prediction model
+
+```{r}
+#str(testCl)
+result <- predict(rfModel, testCl[, -length(names(testCl))])
+result
+
+```
+
+### Save output to files 
+
+As required in the assignment
+
+```{r}
+answers <- as.vector(result)
+
+pml_write_files = function(x) {
+n = length(x)
+for (i in 1:n) {
+filename = paste0("problem_id_", i, ".txt")
+write.table(x[i], file = filename, quote = FALSE,
+row.names = FALSE,
+col.names = FALSE)
+}
+}
+pml_write_files(result)
+```
+
+
+
+
